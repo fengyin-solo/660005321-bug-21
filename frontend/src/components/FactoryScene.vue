@@ -90,10 +90,26 @@ function updateDevices() {
   }
 }
 
+function resize() {
+  if (!renderer || !camera || !container.value) return
+  const w = container.value.clientWidth, h = container.value.clientHeight
+  if (w === 0 || h === 0) return
+  camera.aspect = w / h
+  camera.updateProjectionMatrix()
+  renderer.setSize(w, h)
+}
+
 function animate() { animId = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
-onMounted(() => { initScene(); animate() })
+onMounted(() => { initScene(); animate(); window.addEventListener('resize', resize) })
 watch(() => store.data, updateDevices, { deep: true })
-onUnmounted(() => { cancelAnimationFrame(animId); renderer?.dispose() })
+onUnmounted(() => {
+  cancelAnimationFrame(animId)
+  window.removeEventListener('resize', resize)
+  renderer?.dispose()
+  if (renderer?.domElement.parentElement === container.value) {
+    container.value?.removeChild(renderer.domElement)
+  }
+})
 </script>
 
 <style scoped>

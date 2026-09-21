@@ -1,5 +1,5 @@
 <template>
-  <div class="panel">
+  <div class="panel" :class="{big}">
     <h4>📋 设备状态</h4>
     <div class="dev-list">
       <div v-for="dev in devices" :key="dev.id" class="dev-row" :style="{borderLeftColor: STATUS_COLORS[dev.status]}">
@@ -21,6 +21,7 @@
 import { computed } from 'vue'
 import { useFactoryStore } from '../store/factory'
 import { STATUS_COLORS } from '../types'
+withDefaults(defineProps<{ big?: boolean }>(), { big: false })
 const store = useFactoryStore()
 const devices = computed(() => store.data?.devices || [])
 
@@ -32,8 +33,10 @@ function tagType(s: string) {
 
 <style scoped>
 .panel{background:#0d1b2a;border-radius:8px;padding:12px;border:1px solid #1e3a5f}
+.panel.big{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .panel h4{color:#64b5f6;margin-bottom:8px;font-size:13px}
 .dev-list{display:flex;flex-direction:column;gap:4px;max-height:250px;overflow-y:auto}
+.big .dev-list{flex:1;max-height:none}
 .dev-row{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#112233;border-radius:4px;border-left:3px solid #666}
 .dev-info{display:flex;gap:6px;align-items:center}
 .dev-type{font-size:12px;color:#e0e6ed;font-weight:600}

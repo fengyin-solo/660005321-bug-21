@@ -1,7 +1,9 @@
+from __future__ import annotations
 import asyncio, math, random, time, json, threading
 from collections import defaultdict, deque
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.websockets import WebSocketState
 from pydantic import BaseModel
 import numpy as np
 
@@ -12,6 +14,8 @@ DEVICE_TYPES = ["CNC", "RobotArm", "Conveyor", "AGV", "InjectionMolding", "QCSta
 STATUSES = ["RUNNING", "IDLE", "FAULT", "OFFLINE"]
 ACTIVE_CLIENTS: list[WebSocket] = []
 SIMULATOR_RUNNING = True
+MAIN_LOOP: asyncio.AbstractEventLoop | None = None
+CLIENTS_LOCK = threading.Lock()
 
 class DeviceState:
     def __init__(self, did: int, dtype: str, x: float, y: float, z: float):
@@ -117,12 +121,19 @@ def simulate():
         dead = []
         for ws in ACTIVE_CLIENTS:
             try:
-                asyncio.run_coroutine_threadsafe(ws.send_text(msg), asyncio.get_event_loop())
-            except:
+                # 模拟器运行在独立线程，必须用启动时捕获的主事件循环投递协程；
+                # asyncio.get_event_loop() 在该线程内会拿到 None / 错误的 loop，
+                # 否则挂机一段时间后所有推送静默失败、客户端被误删。
+                if MAIN_LOOP is not None and ws.client_state == WebSocketState.CONNECTED:
+                    asyncio.run_coroutine_threadsafe(ws.send_text(msg), MAIN_LOOP)
+                else:
+                    dead.append(ws)
+            except Exception:
                 dead.append(ws)
-        for ws in dead:
-            if ws in ACTIVE_CLIENTS:
-                ACTIVE_CLIENTS.remove(ws)
+        with CLIENTS_LOCK:
+            for ws in dead:
+                if ws in ACTIVE_CLIENTS:
+                    ACTIVE_CLIENTS.remove(ws)
 
         time.sleep(1)
 
@@ -151,6 +162,8 @@ class OEEAnalysis(BaseModel):
 
 @app.on_event("startup")
 async def startup():
+    global MAIN_LOOP
+    MAIN_LOOP = asyncio.get_running_loop()
     t = threading.Thread(target=simulate, daemon=True)
     t.start()
 
@@ -173,13 +186,15 @@ def get_production():
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
     await websocket.accept()
-    ACTIVE_CLIENTS.append(websocket)
+    with CLIENTS_LOCK:
+        ACTIVE_CLIENTS.append(websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        if websocket in ACTIVE_CLIENTS:
-            ACTIVE_CLIENTS.remove(websocket)
+        with CLIENTS_LOCK:
+            if websocket in ACTIVE_CLIENTS:
+                ACTIVE_CLIENTS.remove(websocket)
 
 
 @app.on_event("shutdown")

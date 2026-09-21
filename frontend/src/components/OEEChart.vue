@@ -10,12 +10,13 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { useFactoryStore } from '../store/factory'
 const store = useFactoryStore(); const chart = ref<HTMLDivElement>(); let inst: echarts.ECharts|null=null
+let ro: ResizeObserver|null = null
 
 function update() {
   if (!inst || !store.data) return
   const oee = store.data.oee
   inst.setOption({
-    backgroundColor:'transparent', grid:{left:30,right:15,top:10,bottom:25},
+    backgroundColor:'transparent', grid:{left:30,right:15,top:10,bottom:32},
     xAxis:{type:'category',data:oee.map(d=>d.type+'-'+d.id),axisLabel:{color:'#94a3b8',fontSize:9,rotate:30}},
     yAxis:{type:'value',max:100,axisLabel:{color:'#94a3b8'}},
     series:[
@@ -24,11 +25,17 @@ function update() {
       {type:'bar',data:oee.map(d=>d.quality),name:'质量',itemStyle:{color:'#3b82f6'},barGap:0},
       {type:'line',data:oee.map(d=>d.oee),name:'OEE',symbol:'diamond',lineStyle:{color:'#f87171',width:2}}
     ],
-    animation:false,legend:{bottom:0,textStyle:{color:'#94a3b8',fontSize:10}}
+    animation:false,
+    legend:{bottom:0,textStyle:{color:'#94a3b8',fontSize:10},itemWidth:10,itemHeight:10,type:'scroll'}
   })
 }
-onMounted(()=>{if(chart.value){inst=echarts.init(chart.value);update()}})
+onMounted(()=>{
+  if(chart.value){
+    inst=echarts.init(chart.value);update()
+    ro=new ResizeObserver(()=>inst?.resize()); ro.observe(chart.value)
+  }
+})
 watch(()=>store.data,update)
-onUnmounted(()=>inst?.dispose())
+onUnmounted(()=>{ro?.disconnect();inst?.dispose()})
 </script>
 <style scoped>.chart-panel{background:#0d1b2a;border-radius:8px;padding:12px;border:1px solid #1e3a5f}.chart-panel h4{color:#64b5f6;font-size:13px;margin-bottom:4px}.chart{width:100%;height:200px}</style>
