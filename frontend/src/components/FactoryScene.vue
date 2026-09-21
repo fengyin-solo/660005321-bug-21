@@ -12,6 +12,7 @@ import { DEVICE_COLORS, STATUS_COLORS } from '../types'
 const store = useFactoryStore()
 const container = ref<HTMLDivElement>()
 let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, controls: OrbitControls, animId: number
+let ro: ResizeObserver | null = null
 const deviceGroup = new THREE.Group()
 const deviceMeshes: Map<number, THREE.Group> = new Map()
 
@@ -90,10 +91,22 @@ function updateDevices() {
   }
 }
 
+function onResize() {
+  const c = container.value
+  if (!c || !renderer) return
+  camera.aspect = c.clientWidth / c.clientHeight
+  camera.updateProjectionMatrix()
+  renderer.setSize(c.clientWidth, c.clientHeight)
+}
+
 function animate() { animId = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
-onMounted(() => { initScene(); animate() })
+onMounted(() => {
+  initScene(); animate()
+  ro = new ResizeObserver(onResize)
+  ro.observe(container.value!)
+})
 watch(() => store.data, updateDevices, { deep: true })
-onUnmounted(() => { cancelAnimationFrame(animId); renderer?.dispose() })
+onUnmounted(() => { cancelAnimationFrame(animId); ro?.disconnect(); renderer?.dispose() })
 </script>
 
 <style scoped>

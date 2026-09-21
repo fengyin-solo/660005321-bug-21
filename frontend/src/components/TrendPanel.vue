@@ -6,6 +6,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { useFactoryStore } from '../store/factory'
 const store = useFactoryStore(); const chart = ref<HTMLDivElement>(); let inst: echarts.ECharts|null=null
+let ro: ResizeObserver|null=null
 function update() {
   if (!inst||!store.data) return
   const ds = store.data.devices.slice(0,4)
@@ -19,8 +20,15 @@ function update() {
     ],animation:false
   })
 }
-onMounted(()=>{if(chart.value){inst=echarts.init(chart.value);update()}})
+onMounted(()=>{
+  if(chart.value){
+    inst=echarts.init(chart.value)
+    ro=new ResizeObserver(()=>inst?.resize())
+    ro.observe(chart.value)
+    update()
+  }
+})
 watch(()=>store.data,update)
-onUnmounted(()=>inst?.dispose())
+onUnmounted(()=>{ro?.disconnect();inst?.dispose()})
 </script>
 <style scoped>.chart-panel{background:#0d1b2a;border-radius:8px;padding:12px;border:1px solid #1e3a5f}.chart-panel h4{color:#64b5f6;font-size:13px;margin-bottom:4px}.chart{width:100%;height:200px}</style>
